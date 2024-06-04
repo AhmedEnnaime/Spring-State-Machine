@@ -37,10 +37,25 @@ class PaymentServiceImplTest {
     void preAuth() {
         Payment savedPayment = paymentService.createPayment(payment);
         System.out.println("Initial State: " + savedPayment.getState());
-        paymentService.preAuth(savedPayment.getId());
-        StateMachine<PaymentState, PaymentEvent> sm = paymentService.preAuth(payment.getId());
+        StateMachine<PaymentState, PaymentEvent> sm = paymentService.preAuth(savedPayment.getId());
         Payment preAuthedPayment = paymentRepository.findById(savedPayment.getId()).get();
         System.out.println(sm.getState().getId());
         System.out.println(preAuthedPayment);
+    }
+
+    @Transactional
+    @Test
+    void auth() {
+        Payment savedPayment = paymentService.createPayment(payment);
+        System.out.println("Initial State: " + savedPayment.getState());
+        StateMachine<PaymentState, PaymentEvent> preAuthSm = paymentService.preAuth(savedPayment.getId());
+        if (preAuthSm.getState().getId() == PaymentState.PRE_AUTH) {
+            System.out.println("Payment is pre authorized");
+            StateMachine<PaymentState, PaymentEvent> authSm = paymentService.authorizePayment(savedPayment.getId());
+            System.out.println("Result State: " + authSm.getState().getId());
+        }else {
+            System.out.println("Payment failed in pre authorization");
+        }
+
     }
 }
