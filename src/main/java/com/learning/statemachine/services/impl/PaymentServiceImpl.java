@@ -33,7 +33,7 @@ public class PaymentServiceImpl implements PaymentService {
     @Override
     public StateMachine<PaymentState, PaymentEvent> preAuth(Long paymentId) {
         StateMachine<PaymentState, PaymentEvent> stateMachine = build(paymentId);
-        sendEvent(paymentId, stateMachine, PaymentEvent.PRE_AUTH_APPROVED);
+        sendEvent(paymentId, stateMachine, PaymentEvent.PRE_AUTHORIZED);
         return stateMachine;
     }
 
