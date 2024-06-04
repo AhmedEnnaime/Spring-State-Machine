@@ -5,6 +5,7 @@ import com.learning.statemachine.domain.PaymentEvent;
 import com.learning.statemachine.domain.PaymentState;
 import com.learning.statemachine.repositories.PaymentRepository;
 import com.learning.statemachine.services.PaymentService;
+import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
 import org.springframework.messaging.Message;
 import org.springframework.messaging.support.MessageBuilder;
@@ -20,6 +21,7 @@ public class PaymentServiceImpl implements PaymentService {
     public static final String PAYMENT_ID_HEADER = "paymentId";
     private final PaymentRepository paymentRepository;
     private final StateMachineFactory<PaymentState, PaymentEvent> stateMachineFactory;
+    private final PaymentStateChangeInterceptor paymentStateChangeInterceptor;
 
     @Override
     public Payment createPayment(Payment payment) {
@@ -27,25 +29,28 @@ public class PaymentServiceImpl implements PaymentService {
         return paymentRepository.save(payment);
     }
 
+    @Transactional
     @Override
     public StateMachine<PaymentState, PaymentEvent> preAuth(Long paymentId) {
         StateMachine<PaymentState, PaymentEvent> stateMachine = build(paymentId);
-        sendEvent(paymentId, stateMachine, PaymentEvent.PRE_AUTHORIZED);
-        return null;
+        sendEvent(paymentId, stateMachine, PaymentEvent.PRE_AUTH_APPROVED);
+        return stateMachine;
     }
 
+    @Transactional
     @Override
     public StateMachine<PaymentState, PaymentEvent> authorizePayment(Long paymentId) {
         StateMachine<PaymentState, PaymentEvent> stateMachine = build(paymentId);
         sendEvent(paymentId, stateMachine, PaymentEvent.AUTHORIZE_APPROVED);
-        return null;
+        return stateMachine;
     }
 
+    @Transactional
     @Override
     public StateMachine<PaymentState, PaymentEvent> declineAuth(Long paymentId) {
         StateMachine<PaymentState, PaymentEvent> stateMachine = build(paymentId);
         sendEvent(paymentId, stateMachine, PaymentEvent.AUTHORIZE_DECLINED);
-        return null;
+        return stateMachine;
     }
 
     private void sendEvent(Long paymentId, StateMachine<PaymentState, PaymentEvent> stateMachine, PaymentEvent paymentEvent) {
@@ -61,6 +66,7 @@ public class PaymentServiceImpl implements PaymentService {
         StateMachine<PaymentState, PaymentEvent> sm = stateMachineFactory.getStateMachine(Long.toString(payment.getId()));
         sm.stop();
         sm.getStateMachineAccessor().doWithAllRegions(sma -> {
+            sma.addStateMachineInterceptor(paymentStateChangeInterceptor);
             sma.resetStateMachine(new DefaultStateMachineContext<>(payment.getState(), null, null, null));
         });
 
